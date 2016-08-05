@@ -3,7 +3,6 @@ from itertools import takewhile
 from operator import itemgetter
 
 import numpy as np
-import pandas as pd
 
 DATA_FILENAME = os.path.join(os.path.dirname(__file__), 'data.npz')
 
@@ -28,9 +27,6 @@ class ConceptNet:
         data = np.load(DATA_FILENAME)
         self.relations = data['relations']
         self.concepts = data['concepts']
-
-        self.relations = pd.read_csv(RELATIONS_FILEPATH, squeeze=True, dtype=np.object, header=None).values
-        self.concepts = pd.read_csv(CONCEPTS_FILEPATH, squeeze=True, dtype=np.object, header=None).values
 
         self.assertions = dict()
         for i, relation in enumerate(self.relations):

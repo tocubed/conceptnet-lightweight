@@ -1,7 +1,20 @@
+import os.path
+import shutil
+from urllib.request import urlopen
+
 import numpy as np
 import pandas as pd
 
-ASSERTION_FILES = ["data/assertions/part_0" + str(n) + ".csv" for n in range(8)]
+CONCEPTNET_DOWNLOAD_URL = 'http://conceptnet5.media.mit.edu/downloads/current/conceptnet5_flat_csv_5.4.tar.bz2'
+
+
+def download():
+    """
+    Download the CSV archive from the ConceptNet site.
+    """
+    req = urlopen(CONCEPTNET_DOWNLOAD_URL)
+    with open('data.tar.bz2', 'wb') as file:
+        shutil.copyfileobj(req, file)
 
 
 def extract():
@@ -34,4 +47,12 @@ def extract():
     np.savez_compressed('data.npz', relations=relations, concepts=concepts, **relation_edges)
 
 
-extract()
+def main():
+    if not os.path.isfile('data.tar.bz2'):
+        download()
+
+    extract()
+
+
+if __name__ == '__main__':
+    main()
