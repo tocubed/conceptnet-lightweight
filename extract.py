@@ -1,52 +1,37 @@
-from collections import defaultdict
+import numpy as np
+import pandas as pd
+
+ASSERTION_FILES = ["data/assertions/part_0" + str(n) + ".csv" for n in range(8)]
 
 
-def _is_wanted_assertion(relation, concept_origin, concept_target):
-    relation_marker = '/r/'
-    english_concept_marker = '/c/en/'
-    return relation.startswith(relation_marker) and concept_origin.startswith(english_concept_marker) and concept_target.startswith(english_concept_marker) \
-        and len(concept_origin) > len(english_concept_marker) and len(concept_target) > len(english_concept_marker)
+def extract():
+    """
+    Extract english-only assertions from ConceptNet5, sans metadata, and save them as compressed numpy arrays.
+    """
+    def assertions_filter(df):
+        relations_only = df[1].str.startswith('/r/')
+        english_only = df[2].str.startswith('/c/en/') & df[3].str.startswith('/c/en/')
+
+        concepts_only = (df[2] != '/c/en/') & (df[3] != '/c/en/')
+
+        return relations_only & english_only & concepts_only
+
+    assertions = pd.DataFrame()
+    for file in ASSERTION_FILES:
+        df_iter = pd.read_csv(file, delimiter='\t', usecols=[1, 2, 3], header=None, iterator=True, chunksize=2 ** 16)
+        assertions = pd.concat([assertions] + [chunk[assertions_filter(chunk)] for chunk in df_iter])
+
+    relations = np.sort(assertions[1].unique())
+    concepts = np.unique(np.concatenate((assertions[2].unique(), assertions[3].unique())))
+
+    relations_idx = {relation: idx for idx, relation in enumerate(relations)}
+    concepts_idx = {concept: idx for idx, concept in enumerate(concepts)}
+
+    assertions[1] = assertions[1].apply(lambda r: relations_idx[r])
+    assertions[[2, 3]] = assertions[[2, 3]].applymap(lambda c: concepts_idx[c])
+
+    relation_edges = {str(relation): group[[2, 3]] for relation, edges in assertions.groupby(1)}
+    np.savez_compressed('data.npz', relations=relations, concepts=concepts, **relation_edges)
 
 
-def _strip_markers(relation, concept_origin, concept_target):
-    return relation[3:], concept_origin[6:], concept_target[6:]
-
-
-def get_assertions():
-    assertion_files = ["data/assertions/part_0" + str(n) + ".csv" for n in range(8)]
-
-    for file in assertion_files:
-        with open(file, encoding='utf-8') as assertions:
-            for assertion in assertions:
-                relation, concept_origin, concept_target = assertion.split('\t')[1:4]
-                if _is_wanted_assertion(relation, concept_origin, concept_target):
-                    yield _strip_markers(relation, concept_origin, concept_target)
-
-
-if __name__ == '__main__':
-    relations = set()
-    concepts = set()
-    for relation, concept_origin, concept_target in get_assertions():
-        relations.add(relation)
-        concepts.add(concept_origin)
-        concepts.add(concept_target)
-
-    relations = sorted(list(relations))
-    concepts = sorted(list(concepts))
-
-    with open("relations", mode='w+', encoding='utf-8') as relations_file:
-        relations_file.writelines(map(lambda s: s + '\n', relations))
-
-    with open("concepts", mode='w+', encoding='utf-8') as concepts_file:
-        concepts_file.writelines(map(lambda s: s + '\n', concepts))
-
-    relation_to_i = {relation: i for i, relation in enumerate(relations)}
-    concept_to_i = {concept: i for i, concept in enumerate(concepts)}
-
-    assertions = defaultdict(list)
-    for relation, concept_origin, concept_target in get_assertions():
-        assertions[relation_to_i[relation]].append((concept_to_i[concept_origin], concept_to_i[concept_target]))
-
-    for relation, edges in assertions.items():
-        with open("assertions/" + str(relation), mode='w+') as assertions_file:
-            assertions_file.writelines(map(lambda t: ' '.join(map(str, t)) + '\n', sorted(edges)))
+extract()

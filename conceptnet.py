@@ -5,9 +5,6 @@ from operator import itemgetter
 import numpy as np
 import pandas as pd
 
-RELATIONS_FILEPATH = os.path.join(os.path.dirname(__file__), 'relations')
-CONCEPTS_FILEPATH = os.path.join(os.path.dirname(__file__), 'concepts')
-ASSERTIONS_FILEPATH = os.path.join(os.path.dirname(__file__), 'assertions/')
 DATA_FILENAME = os.path.join(os.path.dirname(__file__), 'data.npz')
 
 
@@ -28,16 +25,19 @@ class ConceptNet:
         """
         Read and initialize relation, concept, and assertion arrays from disk.
         """
+        data = np.load(DATA_FILENAME)
+        self.relations = data['relations']
+        self.concepts = data['concepts']
 
         self.relations = pd.read_csv(RELATIONS_FILEPATH, squeeze=True, dtype=np.object, header=None).values
         self.concepts = pd.read_csv(CONCEPTS_FILEPATH, squeeze=True, dtype=np.object, header=None).values
 
         self.assertions = dict()
         for i, relation in enumerate(self.relations):
-            self.assertions[relation] = pd.read_csv(ASSERTIONS_FILEPATH + str(i),
-                                                    delimiter=' ', dtype=np.uint32, header=None).values
+            edges = data[str(i)]
+            self.assertions[relation] = edges[np.lexsort((edges[:, 1], edges[:, 0]))]
 
-            flipped = np.fliplr(self.assertions[relation])
+            flipped = np.fliplr(edges)
             self.assertions[('!', relation)] = flipped[np.lexsort((flipped[:, 1], flipped[:, 0]))]
 
     def related(self, relation, concept, inverse=False):
