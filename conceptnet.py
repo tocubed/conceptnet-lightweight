@@ -65,7 +65,7 @@ class ConceptNet:
         """
         Convert concept from a string to a Concept. Return None if concept does not exist.
 
-        :param str string: the concept as a string, sans the implied '/c/en'
+        :param str string: the concept as a string, sans the implied '/c/en/'
         :rtype: Concept or None
 
         >>> cn = ConceptNet()

@@ -1,5 +1,6 @@
 import os.path
 import shutil
+import tarfile
 from urllib.request import urlopen
 
 import numpy as np
@@ -12,6 +13,8 @@ def download():
     """
     Download the CSV archive from the ConceptNet site.
     """
+    print("Downloading...")
+
     req = urlopen(CONCEPTNET_DOWNLOAD_URL)
     with open('data.tar.bz2', 'wb') as file:
         shutil.copyfileobj(req, file)
@@ -21,30 +24,58 @@ def extract():
     """
     Extract english-only assertions from ConceptNet5, sans metadata, and save them as compressed numpy arrays.
     """
-    def assertions_filter(df):
-        relations_only = df[1].str.startswith('/r/')
-        english_only = df[2].str.startswith('/c/en/') & df[3].str.startswith('/c/en/')
+    print("Extracting...")
 
-        concepts_only = (df[2] != '/c/en/') & (df[3] != '/c/en/')
+    def filter_relations(relation):
+        if relation.startswith('/r/'):
+            return relation[3:]  # remove '/r/' prefix
+        else:
+            return None
 
-        return relations_only & english_only & concepts_only
+    def filter_concepts(concept):
+        if concept.startswith('/c/en/') and concept != '/c/en/':
+            return concept[6:]  # remove '/c/en/' prefix
+        else:
+            return None
 
-    assertions = pd.DataFrame()
-    for file in ASSERTION_FILES:
-        df_iter = pd.read_csv(file, delimiter='\t', usecols=[1, 2, 3], header=None, iterator=True, chunksize=2 ** 16)
-        assertions = pd.concat([assertions] + [chunk[assertions_filter(chunk)] for chunk in df_iter])
+    # read data from disk and filter
+    assertions = []
+    with tarfile.open('data.tar.bz2', 'r:bz2') as tar:
+        for part in tar:
+            print("Extracting part file...")
+
+            part = tar.extractfile(part)
+            part = pd.read_csv(part, delimiter='\t', usecols=[1, 2, 3], dtype=np.object, header=None,
+                               converters={1: filter_relations, 2: filter_concepts, 3: filter_concepts},
+                               na_filter=False)
+
+            part.dropna(inplace=True)
+            assertions.append(part)
+
+            del part
+
+    assertions = pd.concat(assertions)
+
+    print("Assembling numpy arrays...")
 
     relations = np.sort(assertions[1].unique())
     concepts = np.unique(np.concatenate((assertions[2].unique(), assertions[3].unique())))
 
+    # convert array of strings to array of indices
     relations_idx = {relation: idx for idx, relation in enumerate(relations)}
     concepts_idx = {concept: idx for idx, concept in enumerate(concepts)}
 
     assertions[1] = assertions[1].apply(lambda r: relations_idx[r])
     assertions[[2, 3]] = assertions[[2, 3]].applymap(lambda c: concepts_idx[c])
 
-    relation_edges = {str(relation): group[[2, 3]] for relation, edges in assertions.groupby(1)}
+    # split into arrays by relation
+    relation_edges = {str(relation): edges[[2, 3]] for relation, edges in assertions.groupby(1)}
+
+    print("Saving numpy arrays...")
+
     np.savez_compressed('data.npz', relations=relations, concepts=concepts, **relation_edges)
+
+    print("Done!")
 
 
 def main():
