@@ -1,3 +1,8 @@
+"""
+This script will extract english-only assertions from ConceptNet5, and save them as numpy arrays.
+An archive will be downloaded if data.tar.bz2 does not already exist.
+"""
+
 import os.path
 import shutil
 import tarfile
@@ -22,7 +27,7 @@ def download():
 
 def extract():
     """
-    Extract english-only assertions from ConceptNet5, sans metadata, and save them as compressed numpy arrays.
+    Load english-only assertions from ConceptNet5, removing metadata, and save them as compressed numpy arrays.
     """
     print("Extracting...")
 

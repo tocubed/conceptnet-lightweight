@@ -1,3 +1,9 @@
+"""
+This module provides the ConceptNet class, which uses binary search to lookup concepts related by a relation.
+Inverse relations are also supported. Concepts are stored as indices, and can be converted to and from
+their string names.
+"""
+
 import os.path
 from itertools import takewhile
 from operator import itemgetter
